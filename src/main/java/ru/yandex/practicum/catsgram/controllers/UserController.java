@@ -1,85 +1,49 @@
 package ru.yandex.practicum.catsgram.controllers;
 
-import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.catsgram.exceptions.ConditionsNotMetException;
-import ru.yandex.practicum.catsgram.exceptions.DuplicatedDataException;
-import ru.yandex.practicum.catsgram.exceptions.NotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.catsgram.model.User;
+import ru.yandex.practicum.catsgram.services.UserService;
 
-import java.time.Instant;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    private final Map<Long, User> users = new HashMap<>();
-    private final Map<String, User> usersByEmail = new HashMap<>();
+    private final UserService userService;
+
+    @Autowired
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
 
     @GetMapping
-    public Collection<User> getUsers() {
-        return users.values();
+    public Collection<User> findAll() {
+        return userService.findAll();
+    }
+
+    @GetMapping("/users/{id}")
+    public Optional<User> findById(@PathVariable("id") long userId) {
+        return userService.findById(userId);
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public User create(@RequestBody User user) {
-        String userEmail = user.getEmail();
-
-        if (userEmail == null || userEmail.isBlank()) {
-            throw new ConditionsNotMetException("Имейл должен быть указан");
-        }
-        if (checkEmailExists(userEmail)) {
-            throw new DuplicatedDataException("Этот имейл уже используется");
-        }
-
-        user.setId(getNextId());
-        user.setRegistrationDate(Instant.now());
-        users.put(user.getId(), user);
-        return user;
+        return userService.create(user);
     }
 
     @PutMapping
     public User update(@RequestBody User user) {
-        if (user.getId() == null) {
-            throw new ConditionsNotMetException("Id должен быть указан");
-        }
-
-        if (users.containsKey(user.getId())) {
-            User oldUser = users.get(user.getId());
-            String userEmail = user.getEmail();
-
-            if (userEmail != null) {
-                if (!userEmail.equals(oldUser.getEmail())) {
-                    if (checkEmailExists(userEmail)) {
-                        throw new DuplicatedDataException("Этот имейл уже используется");
-                    }
-                }
-                oldUser.setEmail(userEmail);
-            }
-
-            if (user.getUsername() != null) {
-                oldUser.setUsername(user.getUsername());
-            }
-            if (user.getPassword() != null) {
-                oldUser.setPassword(user.getPassword());
-            }
-
-            return oldUser;
-        }
-        throw new NotFoundException("Пользователь с id = " + user.getId() + " не найден");
-    }
-
-    private long getNextId() {
-        long currentMaxId = users.keySet().stream()
-                .mapToLong(id -> id)
-                .max()
-                .orElse(0);
-        return ++currentMaxId;
-    }
-
-    private boolean checkEmailExists(String email) {
-         return users.values().stream()
-                .anyMatch(user -> user.getEmail().equals(email));
+        return userService.update(user);
     }
 }
